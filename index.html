@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mortgage Accelerator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .animate-enter {
+            animation: enter 0.5s ease-out;
+        }
+        @keyframes enter {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        /* Custom scrollbar for amortization table */
+        .table-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-area, #printable-area * {
+                visibility: visible;
+            }
+            #printable-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            th {
+                background-color: #f2f2f2;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                margin-bottom: 0.5rem;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="main-content">
+        <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+            <!-- Header -->
+            <header class="text-center mb-8">
+                <h1 class="text-4xl md:text-5xl font-bold text-slate-900">Mortgage Accelerator</h1>
+                <p class="mt-2 text-lg text-slate-600">A comprehensive financial planning tool to help you become debt-free faster.</p>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Left Column: Inputs -->
+                <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-lg border border-slate-200 self-start">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-900">Loan Details</h2>
+                    
+                    <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+                        <span class="block sm-inline" id="error-text"></span>
+                    </div>
+
+                    <form id="loan-form" class="space-y-4">
+                         <!-- Loan Type Toggle -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Loan Type</label>
+                            <div class="flex rounded-md shadow-sm">
+                                <input type="radio" name="loanType" id="loanTypeNew" value="new" checked class="hidden peer/new">
+                                <label for="loanTypeNew" class="px-4 py-2 text-sm font-medium text-slate-900 bg-white border border-slate-200 rounded-l-lg cursor-pointer hover:bg-slate-100 peer-checked/new:bg-indigo-600 peer-checked/new:text-white peer-checked/new:border-indigo-600 w-1/2 text-center transition-colors duration-200">New Loan</label>
+                                
+                                <input type="radio" name="loanType" id="loanTypeExisting" value="existing" class="hidden peer/existing">
+                                <label for="loanTypeExisting" class="px-4 py-2 text-sm font-medium text-slate-900 bg-white border-y border-r rounded-r-lg border-slate-200 cursor-pointer hover:bg-slate-100 peer-checked/existing:bg-indigo-600 peer-checked/existing:text-white peer-checked/existing:border-indigo-600 w-1/2 text-center transition-colors duration-200">Existing Loan</label>
+                            </div>
+                        </div>
+
+                        <!-- New Loan Inputs -->
+                        <div id="newLoanInputs">
+                            <div>
+                                <label for="loanAmount" class="block text-sm font-medium text-slate-700">Loan Amount (RM)</label>
+                                <input type="number" id="loanAmount" value="500000" placeholder="e.g., 500000" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="loanTerm" class="block text-sm font-medium text-slate-700">Original Loan Term (Years)</label>
+                                <input type="number" id="loanTerm" value="35" placeholder="e.g., 35" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                        </div>
+                        
+                        <!-- Existing Loan Inputs -->
+                        <div id="existingLoanInputs" class="hidden space-y-4">
+                            <div>
+                                <label for="remainingBalance" class="block text-sm font-medium text-slate-700">Current Remaining Principal (RM)</label>
+                                <p class="text-xs text-slate-500 mt-1">Find this on your latest loan statement.</p>
+                                <input type="number" id="remainingBalance" value="480000" placeholder="e.g., 480000" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            </div>
+                             <div>
+                                <label class="block text-sm font-medium text-slate-700">Remaining Term:</label>
+                                <div class="flex space-x-2">
+                                     <div class="w-1/2">
+                                        <label for="remainingYears" class="block text-xs font-medium text-slate-500">Years</label>
+                                        <input type="number" id="remainingYears" placeholder="e.g., 33" value="33" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    </div>
+                                    <div class="w-1/2">
+                                        <label for="remainingMonths" class="block text-xs font-medium text-slate-500">Months</label>
+                                        <input type="number" id="remainingMonths" placeholder="e.g., 6" value="0" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="interestRate" class="block text-sm font-medium text-slate-700">Annual Interest Rate (%)</label>
+                            <input type="number" id="interestRate" step="0.01" value="4.5" placeholder="e.g., 4.5" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                         <div>
+                            <label for="loanStartDate" class="block text-sm font-medium text-slate-700">Next Payment Date</label>
+                            <input type="date" id="loanStartDate" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+
+                        <!-- Lump Sum Payments -->
+                        <div class="border-t pt-4 mt-4 space-y-3">
+                            <h3 class="text-lg font-semibold text-slate-800">Lump Sum Payments</h3>
+                            <div id="lump-sum-list"></div>
+                            <button type="button" id="add-lump-sum-btn" class="w-full text-sm bg-slate-100 text-slate-700 font-medium py-2 px-4 rounded-lg hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition-colors duration-300">
+                                + Add a one-time payment
+                            </button>
+                        </div>
+
+                        <!-- Calculation Mode Toggle -->
+                        <div class="pt-2 border-t mt-4">
+                            <label class="block text-sm font-medium text-slate-700 my-2">Set Your Goal</label>
+                            <div class="flex rounded-md shadow-sm flex-wrap">
+                                <input type="radio" name="calcMode" id="modeByPayment" value="byPayment" checked class="hidden peer/byPayment">
+                                <label for="modeByPayment" class="px-4 py-2 text-sm font-medium text-slate-900 bg-white border border-slate-200 rounded-l-lg cursor-pointer hover:bg-slate-100 peer-checked/byPayment:bg-indigo-600 peer-checked/byPayment:text-white peer-checked/byPayment:border-indigo-600 w-full text-center transition-colors duration-200">By Extra Payment</label>
+                                
+                                <input type="radio" name="calcMode" id="modeByTerm" value="byTerm" class="hidden peer/byTerm">
+                                <label for="modeByTerm" class="px-4 py-2 text-sm font-medium text-slate-900 bg-white border-y border-r border-slate-200 cursor-pointer hover:bg-slate-100 peer-checked/byTerm:bg-indigo-600 peer-checked/byTerm:text-white peer-checked/byTerm:border-indigo-600 w-full text-center transition-colors duration-200">By Shortening Term</label>
+                                
+                                <input type="radio" name="calcMode" id="modeByInterest" value="byInterest" class="hidden peer/byInterest">
+                                <label for="modeByInterest" class="px-4 py-2 text-sm font-medium text-slate-900 bg-white border-y border-r rounded-r-lg border-slate-200 cursor-pointer hover:bg-slate-100 peer-checked/byInterest:bg-indigo-600 peer-checked/byInterest:text-white peer-checked/byInterest:border-indigo-600 w-full text-center transition-colors duration-200">By Reducing Interest</label>
+                            </div>
+                        </div>
+
+                        <!-- Mode-specific inputs -->
+                        <div id="byTermContainer" class="hidden space-y-2">
+                            <label class="block text-sm font-medium text-slate-700">Shorten Loan By:</label>
+                            <div class="flex space-x-2">
+                                 <div class="w-1/2">
+                                    <label for="shortenYears" class="block text-xs font-medium text-slate-500">Years</label>
+                                    <input type="number" id="shortenYears" placeholder="e.g., 15" value="15" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                </div>
+                                <div class="w-1/2">
+                                    <label for="shortenMonths" class="block text-xs font-medium text-slate-500">Months</label>
+                                    <input type="number" id="shortenMonths" placeholder="e.g., 0" value="0" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="byInterestContainer" class="hidden">
+                            <label for="reduceInterestPercent" class="block text-sm font-medium text-slate-700">Reduce Total Interest By (%)</label>
+                            <input type="number" id="reduceInterestPercent" value="50" placeholder="e.g., 50" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+
+                        <div id="extraPaymentContainer">
+                            <label for="extraPayment" id="extraPaymentLabel" class="block text-sm font-medium text-slate-700">Extra Monthly Payment (RM)</label>
+                            <input type="number" id="extraPayment" value="300" placeholder="e.g., 300" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors duration-200">
+                        </div>
+
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                            Generate Payment Plan
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right Column: Results -->
+                <div id="results-container" class="lg:col-span-2 space-y-8" style="display: none;">
+                    <!-- Savings Summary -->
+                    <div id="summary-card" class="bg-green-600 text-white p-6 rounded-2xl shadow-lg animate-enter">
+                        <h2 class="text-2xl font-bold">Your Potential Savings</h2>
+                        <div class="mt-4 text-center grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-4xl font-bold" id="interest-saved">RM 0</p>
+                                <p class="text-green-200">in Total Interest</p>
+                            </div>
+                            <div>
+                                <p class="text-4xl font-bold" id="time-saved">0 Years</p>
+                                <p class="text-green-200">Paid Off Sooner</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Cards -->
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-enter">
+                        <!-- Standard Plan -->
+                        <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200">
+                            <h3 class="text-xl font-bold text-slate-900">Standard Repayment</h3>
+                            <div class="mt-4 space-y-2">
+                                <div class="flex justify-between"><span class="text-slate-600">Monthly Payment:</span><span class="font-semibold" id="std-monthly">RM 0</span></div>
+                                <div class="flex justify-between"><span class="text-slate-600">Total Interest:</span><span class="font-semibold" id="std-interest">RM 0</span></div>
+                                <div class="flex justify-between"><span class="text-slate-600">Total Paid:</span><span class="font-semibold" id="std-total">RM 0</span></div>
+                                <div class="flex justify-between"><span class="text-slate-600">Payoff Date:</span><span class="font-semibold" id="std-payoff">--</span></div>
+                            </div>
+                            <div class="mt-4 h-64"><canvas id="std-pie-chart"></canvas></div>
+                        </div>
+                        <!-- Accelerated Plan -->
+                         <div class="bg-white p-6 rounded-2xl shadow-lg border-2 border-indigo-500">
+                            <h3 class="text-xl font-bold text-slate-900">Accelerated Repayment</h3>
+                            <div class="mt-4 space-y-2">
+                                <div class="flex justify-between"><span class="text-slate-600">New Monthly Payment:</span><span class="font-semibold" id="acc-monthly">RM 0</span></div>
+                                <div class="flex justify-between"><span class="text-slate-600">Total Interest:</span><span class="font-semibold" id="acc-interest">RM 0</span></div>
+                                <div class="flex justify-between"><span class="text-slate-600">Total Paid:</span><span class="font-semibold" id="acc-total">RM 0</span></div>
+                                <div class="flex justify-between"><span class="text-slate-600">New Payoff Date:</span><span class="font-semibold" id="acc-payoff">--</span></div>
+                            </div>
+                            <div class="mt-4 h-64"><canvas id="acc-pie-chart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <!-- Opportunity Cost Calculator -->
+                    <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 animate-enter">
+                        <h3 class="text-xl font-bold text-slate-900">Debt vs. Invest Analysis</h3>
+                        <p class="text-sm text-slate-600 mt-1">This compares the guaranteed savings from paying extra on your mortgage against the potential gains if you invested that same money instead.</p>
+                        <div class="mt-4">
+                            <label for="investmentReturn" class="block text-sm font-medium text-slate-700">Expected Annual Investment Return (%)</label>
+                            <p class="text-xs text-slate-500 mt-1">Enter a realistic return for investments like stocks or mutual funds.</p>
+                            <input type="number" id="investmentReturn" value="7" step="0.1" placeholder="e.g., 7" class="mt-1 w-full md:w-1/2 px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <div class="mt-4 h-64"><canvas id="opportunity-cost-chart"></canvas></div>
+                        <div class="text-xs text-slate-500 mt-2">
+                            <p><span class="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span><span class="font-semibold">Mortgage Interest Saved:</span> Guaranteed money saved on loan interest.</p>
+                            <p><span class="inline-block w-3 h-3 rounded-full bg-yellow-400 mr-2"></span><span class="font-semibold">Potential Investment Gain:</span> Money you could earn from investing (not guaranteed).</p>
+                        </div>
+                    </div>
+
+
+                    <!-- Loan Balance Chart -->
+                    <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 animate-enter">
+                        <h3 class="text-xl font-bold mb-4 text-slate-900">Loan Balance Over Time</h3>
+                        <div class="h-96"><canvas id="balance-chart"></canvas></div>
+                    </div>
+
+                    <!-- Amortization Table ('Ledger') -->
+                    <div class="bg-white p-6 rounded-2xl shadow-lg border border-slate-200 animate-enter" id="printable-area">
+                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4 no-print">
+                            <h3 class="text-xl font-bold text-slate-900">Payment Ledger</h3>
+                            <div class="flex items-center gap-4">
+                                <select id="table-toggle" class="rounded-md border-slate-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                    <option value="accelerated" selected>Accelerated Plan</option>
+                                    <option value="standard">Standard Plan</option>
+                                </select>
+                                <button id="print-btn" class="text-sm bg-slate-100 text-slate-700 font-medium py-2 px-4 rounded-lg hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-400 transition-colors duration-300">
+                                    Print
+                                </button>
+                                <button id="export-csv-btn" class="text-sm bg-indigo-100 text-indigo-700 font-medium py-2 px-4 rounded-lg hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-300">
+                                    Export CSV
+                                </button>
+                            </div>
+                        </div>
+                         <h3 id="printable-title" class="hidden text-xl font-bold text-slate-900 mb-4"></h3>
+                        <div id="amortization-table-container" class="table-container max-h-96 overflow-auto">
+                            <!-- Table will be generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        let stdPieChart, accPieChart, balanceChart, opportunityCostChart;
+        document.getElementById('loanStartDate').valueAsDate = new Date();
+        
+        const loanForm = document.getElementById('loan-form');
+        const tableToggle = document.getElementById('table-toggle');
+        
+        // --- NEW FEATURE ELEMENTS ---
+        const loanTypeRadios = document.querySelectorAll('input[name="loanType"]');
+        const newLoanInputsDiv = document.getElementById('newLoanInputs');
+        const existingLoanInputsDiv = document.getElementById('existingLoanInputs');
+        const addLumpSumBtn = document.getElementById('add-lump-sum-btn');
+        const lumpSumListDiv = document.getElementById('lump-sum-list');
+        const investmentReturnInput = document.getElementById('investmentReturn');
+        const exportCsvBtn = document.getElementById('export-csv-btn');
+        const printBtn = document.getElementById('print-btn');
+        let lumpSumCounter = 0;
+
+        // Mode switching elements
+        const modeRadios = document.querySelectorAll('input[name="calcMode"]');
+        const byTermContainer = document.getElementById('byTermContainer');
+        const byInterestContainer = document.getElementById('byInterestContainer');
+        const extraPaymentContainer = document.getElementById('extraPaymentContainer');
+        const extraPaymentInput = document.getElementById('extraPayment');
+        const extraPaymentLabel = document.getElementById('extraPaymentLabel');
+        
+        // Error handling elements
+        const errorMessageDiv = document.getElementById('error-message');
+        const errorTextSpan = document.getElementById('error-text');
+
+        // --- EVENT LISTENERS ---
+        loanForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            calculateAndDisplay();
+        });
+
+        tableToggle.addEventListener('change', () => calculateAndDisplay(false));
+        modeRadios.forEach(radio => radio.addEventListener('change', handleModeChange));
+        loanTypeRadios.forEach(radio => radio.addEventListener('change', handleLoanTypeChange));
+        addLumpSumBtn.addEventListener('click', addLumpSumInput);
+        investmentReturnInput.addEventListener('input', () => calculateAndDisplay(false));
+        exportCsvBtn.addEventListener('click', exportLedgerToCSV);
+        printBtn.addEventListener('click', printLedger);
+
+
+        // --- FEATURE IMPLEMENTATION FUNCTIONS ---
+        
+        function printLedger() {
+            const planType = document.getElementById('table-toggle').value;
+            const title = planType.charAt(0).toUpperCase() + planType.slice(1) + " Plan Payment Ledger";
+            document.getElementById('printable-title').textContent = title;
+            document.getElementById('printable-title').classList.remove('hidden');
+
+            window.print();
+
+            document.getElementById('printable-title').classList.add('hidden');
+        }
+
+        function handleLoanTypeChange() {
+            const selectedType = document.querySelector('input[name="loanType"]:checked').value;
+            if (selectedType === 'new') {
+                newLoanInputsDiv.classList.remove('hidden');
+                existingLoanInputsDiv.classList.add('hidden');
+                document.querySelector('label[for="loanStartDate"]').textContent = 'Payment Start Date';
+            } else {
+                newLoanInputsDiv.classList.add('hidden');
+                existingLoanInputsDiv.classList.remove('hidden');
+                document.querySelector('label[for="loanStartDate"]').textContent = 'Next Payment Date';
+            }
+        }
+
+        function addLumpSumInput() {
+            lumpSumCounter++;
+            const div = document.createElement('div');
+            div.className = 'flex items-center space-x-2';
+            div.id = `lump-sum-row-${lumpSumCounter}`;
+            
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const nextYear = new Date(new Date().setFullYear(new Date().getFullYear() + 1));
+
+
+            div.innerHTML = `
+                <input type="number" placeholder="Amount (RM)" class="lump-sum-amount block w-1/2 px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <input type="date" value="${nextYear.toISOString().split('T')[0]}" class="lump-sum-date block w-1/2 px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                <button type="button" onclick="document.getElementById('lump-sum-row-${lumpSumCounter}').remove()" class="text-red-500 hover:text-red-700 p-1 rounded-full">&times;</button>
+            `;
+            lumpSumListDiv.appendChild(div);
+        }
+
+        function getLumpSumData() {
+            const amounts = document.querySelectorAll('.lump-sum-amount');
+            const dates = document.querySelectorAll('.lump-sum-date');
+            const lumpSums = [];
+            for (let i = 0; i < amounts.length; i++) {
+                const amount = parseFloat(amounts[i].value);
+                const date = dates[i].value;
+                if (!isNaN(amount) && amount > 0 && date) {
+                    // Normalize date to YYYY-MM for comparison
+                    const d = new Date(date);
+                    lumpSums.push({ amount, yearMonth: `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}` });
+                }
+            }
+            return lumpSums;
+        }
+
+        function exportLedgerToCSV() {
+            const table = document.querySelector('#amortization-table-container table');
+            if (!table) return;
+
+            let csv = [];
+            const rows = table.querySelectorAll('tr');
+
+            for (const row of rows) {
+                const cols = row.querySelectorAll('th, td');
+                const rowData = Array.from(cols).map(col => `"${col.innerText.replace(/"/g, '""')}"`);
+                csv.push(rowData.join(','));
+            }
+
+            const csvContent = 'data:text/csv;charset=utf-8,' + csv.join('\n');
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            const planType = document.getElementById('table-toggle').value;
+            link.setAttribute('download', `mortgage_ledger_${planType}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // --- CORE LOGIC & CALCULATION FUNCTIONS ---
+
+        function handleModeChange() {
+            const selectedMode = document.querySelector('input[name="calcMode"]:checked').value;
+            byTermContainer.classList.add('hidden');
+            byInterestContainer.classList.add('hidden');
+            extraPaymentContainer.classList.remove('hidden');
+            extraPaymentInput.readOnly = true;
+            extraPaymentInput.classList.add('bg-slate-100', 'cursor-not-allowed');
+            extraPaymentLabel.textContent = 'Calculated Extra Payment (RM)';
+
+            if (selectedMode === 'byPayment') {
+                extraPaymentInput.readOnly = false;
+                extraPaymentInput.classList.remove('bg-slate-100', 'cursor-not-allowed');
+                extraPaymentLabel.textContent = 'Extra Monthly Payment (RM)';
+            } else if (selectedMode === 'byTerm') {
+                byTermContainer.classList.remove('hidden');
+            } else if (selectedMode === 'byInterest') {
+                byInterestContainer.classList.remove('hidden');
+            }
+        }
+
+        function showError(message) {
+            errorTextSpan.textContent = message;
+            errorMessageDiv.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorMessageDiv.classList.add('hidden');
+        }
+
+        function formatCurrency(num) {
+            return `RM ${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        function formatDate(date) {
+            return date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        }
+        
+        function calculateAmortization(principal, annualRate, termMonths, extraPayment = 0, startDate = new Date(), lumpSums = []) {
+            const monthlyRate = annualRate / 100 / 12;
+            if (monthlyRate <= 0) return { schedule: [], totalInterest: 0, standardMonthlyPayment: 0, acceleratedMonthlyPayment: 0, totalMonths: 0 };
+            
+            const mFactor = Math.pow(1 + monthlyRate, termMonths);
+            const standardMonthlyPayment = principal * (monthlyRate * mFactor) / (mFactor - 1);
+            if (isNaN(standardMonthlyPayment) || !isFinite(standardMonthlyPayment)) return { schedule: [], totalInterest: 0, standardMonthlyPayment: 0, acceleratedMonthlyPayment: 0, totalMonths: 0 };
+            
+            const acceleratedMonthlyPayment = standardMonthlyPayment + extraPayment;
+            let balance = principal;
+            let totalInterest = 0;
+            const schedule = [];
+            let month = 0;
+
+            while (balance > 0 && month < termMonths * 2) { // Safety break
+                month++;
+                
+                const paymentDate = new Date(startDate);
+                paymentDate.setMonth(startDate.getMonth() + month - 1);
+                const currentYearMonth = `${paymentDate.getFullYear()}-${String(paymentDate.getMonth()).padStart(2, '0')}`;
+
+                // Apply lump sums for the current month
+                const applicableLumpSums = lumpSums.filter(ls => ls.yearMonth === currentYearMonth);
+                let totalLumpSumThisMonth = 0;
+                if (applicableLumpSums.length > 0) {
+                     totalLumpSumThisMonth = applicableLumpSums.reduce((sum, ls) => sum + ls.amount, 0);
+                     balance -= totalLumpSumThisMonth;
+                }
+
+                let interestForMonth = balance * monthlyRate;
+                let principalPaid = acceleratedMonthlyPayment - interestForMonth;
+
+                if (balance < acceleratedMonthlyPayment) {
+                    principalPaid = balance;
+                }
+                
+                balance -= principalPaid;
+                totalInterest += interestForMonth;
+                if (balance < 0) balance = 0;
+                
+                schedule.push({ month, date: paymentDate, interest: interestForMonth, principal: principalPaid, lumpSum: totalLumpSumThisMonth, balance });
+            }
+            return { schedule, totalInterest, standardMonthlyPayment, acceleratedMonthlyPayment, totalMonths: month };
+        }
+
+        function calculateAndDisplay(animate = true) {
+            hideError();
+            
+            const loanType = document.querySelector('input[name="loanType"]:checked').value;
+            let loanAmount, loanTermMonths;
+
+            if (loanType === 'new') {
+                loanAmount = parseFloat(document.getElementById('loanAmount').value);
+                loanTermMonths = parseInt(document.getElementById('loanTerm').value) * 12;
+            } else {
+                loanAmount = parseFloat(document.getElementById('remainingBalance').value);
+                const years = parseInt(document.getElementById('remainingYears').value) || 0;
+                const months = parseInt(document.getElementById('remainingMonths').value) || 0;
+                loanTermMonths = (years * 12) + months;
+            }
+
+            const interestRate = parseFloat(document.getElementById('interestRate').value);
+            const loanStartDate = new Date(document.getElementById('loanStartDate').value);
+
+            if (isNaN(loanAmount) || isNaN(interestRate) || isNaN(loanTermMonths) || loanAmount <= 0 || interestRate <= 0 || loanTermMonths <= 0) {
+                showError("Please enter valid loan details. All fields must be positive numbers.");
+                return;
+            }
+            
+            const lumpSums = getLumpSumData();
+            const stdData = calculateAmortization(loanAmount, interestRate, loanTermMonths, 0, loanStartDate, []); // Standard plan has no lump sums or extra payments
+            if (stdData.schedule.length === 0) {
+                showError("Could not calculate the standard loan plan. Please check the input values.");
+                return;
+            }
+
+            const calculationMode = document.querySelector('input[name="calcMode"]:checked').value;
+            let extraPayment = 0;
+
+            if (calculationMode === 'byPayment') {
+                extraPayment = parseFloat(extraPaymentInput.value) || 0;
+            } else {
+                 let targetTermMonths = loanTermMonths;
+                if (calculationMode === 'byTerm') {
+                    const shortenYears = parseInt(document.getElementById('shortenYears').value) || 0;
+                    const shortenMonths = parseInt(document.getElementById('shortenMonths').value) || 0;
+                    const shortenTotalMonths = (shortenYears * 12) + shortenMonths;
+                    if (shortenTotalMonths >= loanTermMonths || shortenTotalMonths < 0) {
+                        showError("The loan cannot be shortened by a period longer than the term itself.");
+                        return;
+                    }
+                    targetTermMonths = loanTermMonths - shortenTotalMonths;
+                }
+                
+                // Binary search for extra payment for both 'byTerm' and 'byInterest'
+                let low = 0, high = loanAmount;
+                let mid = 0;
+
+                for (let i = 0; i < 50; i++) { // Iteration limit
+                    mid = (low + high) / 2;
+                    const testData = calculateAmortization(loanAmount, interestRate, loanTermMonths, mid, loanStartDate, lumpSums);
+                    
+                    if (calculationMode === 'byTerm') {
+                        if (testData.totalMonths > targetTermMonths) low = mid;
+                        else high = mid;
+                    } else { // byInterest
+                        const reducePercent = parseFloat(document.getElementById('reduceInterestPercent').value) || 0;
+                         if (reducePercent < 0 || reducePercent >= 100) {
+                            showError("Interest reduction must be between 0 and 99.9%.");
+                            return;
+                        }
+                        const targetInterest = stdData.totalInterest * (1 - reducePercent / 100);
+                        if (testData.totalInterest > targetInterest) low = mid;
+                        else high = mid;
+                    }
+                }
+                 extraPayment = mid;
+            }
+
+
+            if (extraPayment < 0) extraPayment = 0;
+            extraPaymentInput.value = extraPayment.toFixed(2);
+
+            const accData = calculateAmortization(loanAmount, interestRate, loanTermMonths, extraPayment, loanStartDate, lumpSums);
+            
+            document.getElementById('results-container').style.display = 'block';
+            if (animate) {
+                document.querySelectorAll('.animate-enter').forEach(el => { el.classList.remove('animate-enter'); void el.offsetWidth; el.classList.add('animate-enter'); });
+            }
+
+            const interestSaved = stdData.totalInterest - accData.totalInterest;
+            const monthsSaved = stdData.totalMonths - accData.totalMonths;
+            const yearsSaved = Math.floor(monthsSaved / 12);
+            const remainingMonths = monthsSaved % 12;
+            
+            document.getElementById('interest-saved').textContent = formatCurrency(interestSaved > 0 ? interestSaved : 0);
+            document.getElementById('time-saved').textContent = `${yearsSaved} Years, ${remainingMonths} Months`;
+            
+            document.getElementById('std-monthly').textContent = formatCurrency(stdData.standardMonthlyPayment);
+            document.getElementById('std-interest').textContent = formatCurrency(stdData.totalInterest);
+            document.getElementById('std-total').textContent = formatCurrency(loanAmount + stdData.totalInterest);
+            document.getElementById('std-payoff').textContent = stdData.schedule.length > 0 ? formatDate(stdData.schedule[stdData.schedule.length - 1].date) : '--';
+            
+            document.getElementById('acc-monthly').textContent = formatCurrency(accData.acceleratedMonthlyPayment);
+            document.getElementById('acc-interest').textContent = formatCurrency(accData.totalInterest);
+            document.getElementById('acc-total').textContent = formatCurrency(loanAmount + accData.totalInterest);
+            document.getElementById('acc-payoff').textContent = accData.schedule.length > 0 ? formatDate(accData.schedule[accData.schedule.length - 1].date) : '--';
+
+            renderPieCharts(loanAmount, stdData.totalInterest, accData.totalInterest);
+            renderBalanceChart(stdData.schedule, accData.schedule);
+            
+            const selectedTable = tableToggle.value;
+            renderAmortizationTable(selectedTable === 'standard' ? stdData.schedule : accData.schedule, stdData.standardMonthlyPayment);
+
+            // Render opportunity cost chart
+            calculateAndRenderOpportunityCost(extraPayment, accData.totalMonths, interestSaved, lumpSums);
+        }
+
+        function calculateAndRenderOpportunityCost(extraMonthly, months, interestSaved, lumpSums) {
+            const annualReturn = parseFloat(investmentReturnInput.value) / 100;
+            if (isNaN(annualReturn)) return;
+
+            const monthlyReturn = annualReturn / 12;
+            let futureValue = 0;
+            
+            // Calculate future value of monthly investments
+            if (monthlyReturn > 0) {
+                futureValue = extraMonthly * ((Math.pow(1 + monthlyReturn, months) - 1) / monthlyReturn);
+            } else {
+                futureValue = extraMonthly * months;
+            }
+
+            // Calculate future value of lump sum investments
+            // For simplicity, we assume lump sums are invested and compound for the remaining duration of the *accelerated* loan.
+            const totalLoanMonths = months;
+            const startDate = new Date(document.getElementById('loanStartDate').value);
+
+            lumpSums.forEach(ls => {
+                const lsDate = new Date(`${ls.yearMonth.split('-')[0]}-${parseInt(ls.yearMonth.split('-')[1])+1}-01`);
+                const monthsRemaining = totalLoanMonths - ((lsDate.getFullYear() - startDate.getFullYear()) * 12 + (lsDate.getMonth() - startDate.getMonth()));
+                if(monthsRemaining > 0) {
+                     futureValue += ls.amount * Math.pow(1 + monthlyReturn, monthsRemaining);
+                }
+            });
+
+
+            const data = {
+                labels: ['Outcome'],
+                datasets: [
+                    {
+                        label: 'Mortgage Interest Saved',
+                        data: [interestSaved],
+                        backgroundColor: '#4ade80',
+                    },
+                    {
+                        label: 'Potential Investment Gain',
+                        data: [futureValue],
+                        backgroundColor: '#facc15',
+                    }
+                ]
+            };
+            if(opportunityCostChart) opportunityCostChart.destroy();
+            opportunityCostChart = new Chart(document.getElementById('opportunity-cost-chart'), {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    scales: {
+                         x: { beginAtZero: true, ticks: { callback: value => 'RM ' + (value/1000) + 'k' }, title: { display: true, text: 'Value (RM)' } },
+                         y: { stacked: true }
+                    },
+                     plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // --- CHART & TABLE RENDERING FUNCTIONS ---
+
+        function renderPieCharts(principal, stdInterest, accInterest) {
+            const pieConfig = (interest) => ({ type: 'pie', data: { labels: ['Principal', 'Interest'], datasets: [{ data: [principal, interest], backgroundColor: ['#4f46e5', '#a5b4fc'], borderColor: '#ffffff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, title: { display: false } } } });
+            if (stdPieChart) stdPieChart.destroy();
+            stdPieChart = new Chart(document.getElementById('std-pie-chart'), pieConfig(stdInterest));
+            if (accPieChart) accPieChart.destroy();
+            accPieChart = new Chart(document.getElementById('acc-pie-chart'), pieConfig(accInterest));
+        }
+
+        function renderBalanceChart(stdSchedule, accSchedule) {
+            const labels = Array.from({ length: stdSchedule.length }, (_, i) => i + 1);
+            const stdBalanceData = stdSchedule.map(row => row.balance);
+            const accBalanceData = accSchedule.map(row => row.balance);
+            while (accBalanceData.length < stdBalanceData.length) accBalanceData.push(null);
+            
+            if (balanceChart) balanceChart.destroy();
+            balanceChart = new Chart(document.getElementById('balance-chart'), { type: 'line', data: { labels: labels, datasets: [{ label: 'Standard Repayment', data: stdBalanceData, borderColor: '#94a3b8', backgroundColor: '#94a3b820', fill: true, pointRadius: 0, tension: 0.1 }, { label: 'Accelerated Repayment', data: accBalanceData, borderColor: '#4f46e5', backgroundColor: '#4f46e520', fill: true, pointRadius: 0, tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Month' } }, y: { title: { display: true, text: 'Loan Balance (RM)' }, ticks: { callback: value => 'RM ' + (value/1000) + 'k' } } }, plugins: { legend: { position: 'top' } } } });
+        }
+        
+        function renderAmortizationTable(schedule, standardMonthlyPayment = 0) {
+            const container = document.getElementById('amortization-table-container');
+            let tableHTML = `<table class="min-w-full divide-y divide-slate-200"><thead class="bg-slate-50 sticky top-0 z-10"><tr><th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Month</th><th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th><th class="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Principal</th><th class="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Interest</th><th class="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Extra to Principal</th><th class="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Lump Sum</th><th class="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Total Payment</th><th class="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Balance</th></tr></thead><tbody class="bg-white divide-y divide-slate-200">`;
+            schedule.forEach(row => {
+                const regularPayment = row.principal + row.interest;
+                const totalPayment = regularPayment + row.lumpSum;
+                const extraPaid = standardMonthlyPayment > 0 ? Math.max(0, regularPayment - standardMonthlyPayment) : 0;
+                tableHTML += `<tr><td class="px-4 py-2 whitespace-nowrap text-sm text-slate-700">${row.month}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-slate-700">${formatDate(row.date)}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-slate-700 text-right">${formatCurrency(row.principal)}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-slate-700 text-right">${formatCurrency(row.interest)}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-green-600 font-medium text-right">${formatCurrency(extraPaid)}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-blue-600 font-medium text-right">${formatCurrency(row.lumpSum)}</td><td class="px-4 py-2 whitespace-nowrap text-sm text-slate-700 text-right font-medium">${formatCurrency(totalPayment)}</td><td class="px-4 py-2 whitespace-nowrap text-sm font-semibold text-slate-800 text-right">${formatCurrency(row.balance)}</td></tr>`;
+            });
+            tableHTML += `</tbody></table>`;
+            container.innerHTML = tableHTML;
+        }
+
+        // --- INITIAL SETUP ---
+        window.onload = () => {
+            handleModeChange();
+            handleLoanTypeChange();
+            calculateAndDisplay(false);
+        };
+    </script>
+</body>
+</html>
+
